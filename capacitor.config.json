@@ -1,0 +1,9 @@
+{
+  "appId": "com.meshchat.app",
+  "appName": "MeshChat",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,0 +1,20 @@
+MeshChat source snapshot — 2026-11-24 update
+
+This is a development source ZIP, not a production release and not a verified APK.
+
+Verified in this workspace:
+- 61 automated JavaScript tests pass (0 fail).
+- Relay policy core added and unit-tested: explicit opt-in, bounded opaque-packet envelope validation (caller must supply ciphertext), expiry, hop limit, deduplication, queue quotas, and forward acknowledgement lifecycle.
+- IndexedDB schema v3 includes relay queue and seen-message stores.
+- Relay receive now atomically reserves queue + deduplication records in one IndexedDB read/write transaction, preventing duplicate concurrent arrivals and queue-quota races. A concurrency regression test passes.
+- GitHub Actions workflow added for automated tests and Android debug APK builds.
+- ZIP integrity is checked when this archive is produced.
+
+Not verified / not complete:
+- Relay service is not yet connected to BLE or Wi-Fi transport; multi-hop phone-to-phone relay is not operational.
+- Native Wi-Fi Direct / Wi-Fi Aware transport is not implemented.
+- Offline voice call signaling and audio are not implemented.
+- Android APK has not been built by GitHub Actions for this update.
+- No real two-phone acceptance test has been performed.
+
+Do not treat this ZIP as a finished or launch-ready app. The next integration work is to connect relay envelopes to the native transport and add real Android Wi-Fi transport, then implement voice calling and run two-device tests.
