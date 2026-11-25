@@ -632,7 +632,7 @@ public class MeshWifiDirectPlugin extends Plugin {
         PeerSocket peer;
         try {
             peer = new PeerSocket(socket);
-            writeFrame(peer, makeHello());
+            writeFrame(peer, makeHello().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (IOException error) {
             closeSocket(socket);
             emitError("socket", "Could not initialize the local Wi-Fi Direct socket.");
