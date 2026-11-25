@@ -174,14 +174,14 @@ public class MeshWifiDirectPlugin extends Plugin {
         }
     }
 
-    private boolean hasPermission(String alias) {
+    private boolean hasAliasPermission(String alias) {
         return getPermissionState(alias) == PermissionState.GRANTED;
     }
 
     private boolean hasRequiredPermission() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            ? hasPermission("nearbyWifi")
-            : Build.VERSION.SDK_INT < Build.VERSION_CODES.M || hasPermission("location");
+            ? hasAliasPermission("nearbyWifi")
+            : Build.VERSION.SDK_INT < Build.VERSION_CODES.M || hasAliasPermission("location");
     }
 
     @PluginMethod
@@ -205,11 +205,11 @@ public class MeshWifiDirectPlugin extends Plugin {
     @PluginMethod
     public void startDiscovery(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (!hasPermission("nearbyWifi")) {
+            if (!hasAliasPermission("nearbyWifi")) {
                 requestPermissionForAlias("nearbyWifi", call, "discoveryPermissionCallback");
                 return;
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasPermission("location")) {
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasAliasPermission("location")) {
             requestPermissionForAlias("location", call, "discoveryPermissionCallback");
             return;
         }
@@ -364,11 +364,11 @@ public class MeshWifiDirectPlugin extends Plugin {
     @PluginMethod
     public void connect(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (!hasPermission("nearbyWifi")) {
+            if (!hasAliasPermission("nearbyWifi")) {
                 requestPermissionForAlias("nearbyWifi", call, "connectPermissionCallback");
                 return;
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasPermission("location")) {
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasAliasPermission("location")) {
             requestPermissionForAlias("location", call, "connectPermissionCallback");
             return;
         }
