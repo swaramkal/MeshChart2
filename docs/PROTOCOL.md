@@ -21,9 +21,9 @@ BLE characteristic writes and notifications have small payload limits that vary 
 - Never relay plaintext.
 - Require explicit user consent before participating as a relay.
 
-## Implemented in v2 (direct one-to-one chat)
+## Implemented in v2 (direct secure channel)
 
-This section describes what the code actually does today. Mesh relay is not implemented.
+This section describes the direct one-to-one protocol and the current relay transport hook. Opaque relay envelopes can be passed over a secure adjacent-peer session, but the application cannot yet create a destination-decryptable envelope for an offline final recipient.
 
 ### Device identity
 Each install creates one ECDSA P-256 identity key on first launch. The private key is non-extractable and stored in IndexedDB; the SHA-256 of the public key (SPKI) is the device fingerprint. Clearing local data deletes it.

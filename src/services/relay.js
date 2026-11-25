@@ -76,13 +76,34 @@ export class RelayService {
     return envelope;
   }
 
-  async receive(envelope, now = Date.now()) {
+  // Queue a message this device created itself. It is sent even when relay
+  // participation is off, because it is the user's own message.
+  async originate(envelope, now = Date.now()) {
+    validateEnvelope(envelope, now);
+    if (envelope.hopsRemaining <= 0) return { accepted: false, reason: 'hop-limit' };
+    await this.db.cleanupRelayData?.(now);
+    return this.store({ ...envelope, receivedAt: now, own: true }, now);
+  }
+
+  async receive(envelope, now = Date.now(), receivedFrom = null) {
     if (!this.enabled) return { accepted: false, reason: 'relay-disabled' };
     validateEnvelope(envelope, now);
     if (envelope.hopsRemaining <= 0) return { accepted: false, reason: 'hop-limit' };
+    if (receivedFrom !== null && (typeof receivedFrom !== 'string' || receivedFrom.length > 128)) {
+      throw new Error('Invalid relay source peer.');
+    }
 
     await this.db.cleanupRelayData?.(now);
-    const packet = { ...envelope, receivedAt: now };
+    const packet = {
+      ...envelope,
+      receivedAt: now,
+      ...(receivedFrom ? { receivedFrom } : {})
+    };
+    return this.store(packet, now);
+  }
+
+  async store(packet, now) {
+    const envelope = packet;
 
     // Real IndexedDB storage reserves queue + deduplication records in one
     // read/write transaction. The fallback keeps lightweight test adapters
@@ -109,9 +130,9 @@ export class RelayService {
   }
 
   async prepareForward(messageId, now = Date.now()) {
-    if (!this.enabled) return null;
     const packet = await this.db.getRelayPacket(messageId);
     if (!packet) return null;
+    if (!this.enabled && !packet.own) return null;
     if (packet.expiresAt <= now || packet.hopsRemaining <= 0) {
       await this.db.deleteRelayPacket(messageId);
       return null;

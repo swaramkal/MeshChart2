@@ -41,6 +41,12 @@ test('relay is disabled by default and requires explicit opt-in', async () => {
   assert.equal((await relay.receive(makeEnvelope(), 11_000)).accepted, true);
 });
 
+test('rejects invalid relay source peer metadata', async () => {
+  const relay = new RelayService(new MemoryRelayDatabase());
+  relay.setEnabled(true);
+  await assert.rejects(() => relay.receive(makeEnvelope(), 11_000, 'x'.repeat(129)), /source peer/);
+});
+
 test('accepts only bounded base64 opaque packets, not raw text', async () => {
   const relay = new RelayService(new MemoryRelayDatabase());
   relay.setEnabled(true);

@@ -14,6 +14,7 @@ export class BluetoothAdapter {
     this.listeners = new Set();
     this.incomingListeners = new Set();
     this.disconnectListeners = new Set();
+    this.statusListeners = new Set();
     this.device = null;
     this.server = null;
     this.characteristic = null;
@@ -46,6 +47,25 @@ export class BluetoothAdapter {
   onDisconnect(callback) {
     this.disconnectListeners.add(callback);
     return () => this.disconnectListeners.delete(callback);
+  }
+
+  onStatus(callback) {
+    this.statusListeners.add(callback);
+    return () => this.statusListeners.delete(callback);
+  }
+
+  async getStatus() {
+    const native = this.getNative();
+    if (native?.getStatus) return native.getStatus();
+    return {
+      available: Boolean(navigator.bluetooth?.requestDevice),
+      state: navigator.bluetooth?.requestDevice ? 'browser-adapter-present' : 'native-adapter-required',
+      detail: 'Bluetooth LE discovery requires the installed Android app.'
+    };
+  }
+
+  emitStatus(status) {
+    for (const callback of this.statusListeners) callback(status);
   }
 
   getPeers() {
@@ -141,10 +161,12 @@ export class BluetoothAdapter {
 
     await native.addListener('onScanError', event => {
       console.error('MeshChat BLE scan error:', event);
+      this.emitStatus({ error: true, detail: `Bluetooth scan failed (${event?.code ?? 'unknown'}).` });
     });
 
     await native.addListener('onAdvertiseError', event => {
       console.error('MeshChat BLE advertising error:', event);
+      this.emitStatus({ error: true, detail: `Bluetooth advertising failed (${event?.code ?? 'unknown'}).` });
     });
 
     this.nativeBound = true;

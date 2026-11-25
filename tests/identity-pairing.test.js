@@ -74,9 +74,13 @@ test('first pairing needs both codes confirmed and pins the identity', async () 
 
   const pairingA = new PairingController(a, {
     getIdentity: async () => idA,
+    getDisplayName: async () => 'Phone A',
     onSecure: (peer, session) => secured.push(session.remoteFingerprint)
   });
-  const pairingB = new PairingController(b, { getIdentity: async () => idB });
+  const pairingB = new PairingController(b, {
+    getIdentity: async () => idB,
+    getDisplayName: async () => 'Phone B'
+  });
 
   try {
     await pairingA.start('addr-b', 'Phone B');
@@ -94,6 +98,8 @@ test('first pairing needs both codes confirmed and pins the identity', async () 
     assert.deepEqual(secured, [idB.fingerprint]);
     assert.equal(pairingA.getSecureSession('addr-b').role, 'initiator');
     assert.equal(pairingB.getSecureSession('addr-a').role, 'responder');
+    assert.equal(pairingA.getSecureSession('addr-b').peerName, 'Phone B');
+    assert.equal(pairingB.getSecureSession('addr-a').peerName, 'Phone A');
   } finally {
     pairingA.destroy();
     pairingB.destroy();
@@ -214,6 +220,22 @@ test('a man-in-the-middle swapping the ephemeral key breaks verification', async
     pairingA.destroy();
     pairingB.destroy();
   }
+});
+
+test('disconnecting one transport alias clears every secure session for the trusted identity', async () => {
+  const { a } = link();
+  const identity = await makeIdentity();
+  const pairing = new PairingController(a, { getIdentity: async () => identity });
+  const other = { remoteFingerprint: identity.fingerprint };
+  pairing.secureSessions.set('ble-address', { remoteFingerprint: identity.fingerprint });
+  pairing.secureSessions.set('wifi-identity', other);
+  pairing.identitySessions.set(identity.fingerprint, other);
+
+  pairing.cancelIdentity(identity.fingerprint, 'disconnected', false);
+
+  assert.equal(pairing.secureSessions.size, 0);
+  assert.equal(pairing.identitySessions.size, 0);
+  pairing.destroy();
 });
 
 test('a disconnect without any pairing does not raise pairing UI', async () => {

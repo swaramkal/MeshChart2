@@ -1,6 +1,6 @@
 # MeshChat relay core (implementation status)
 
-`src/services/relay.js` implements a transport-independent store-and-forward policy for encrypted envelopes.
+`src/services/relay.js` implements the bounded store-and-forward policy. `src/services/relay-transport.js` connects it to secure peer message callbacks and the unified transport manager for opaque envelopes.
 
 ## Implemented and covered by automated tests
 - Relay is disabled by default and requires explicit local opt-in.
@@ -12,10 +12,11 @@
 - A queued packet is removed only after the caller confirms successful forwarding.
 - The local IndexedDB schema has `relayQueue` and `relaySeen` stores, including expiry cleanup, export, and clear support.
 
-## Not implemented by this module
-- Peer discovery, radio transport, route selection, broadcast/unicast delivery, or background execution.
-- Native Android scheduling / battery-safe background relay.
-- Atomic receive reservation across queue + deduplication stores is implemented for IndexedDB. Forwarding leases / multi-worker claim coordination are still not implemented; avoid running multiple independent forwarders against the same database.
-- End-to-end destination decryption and recipient acknowledgement integration.
+## Current transport integration and limitations
+- `RelayTransportBridge` accepts a relay envelope only after the outer packet has passed the existing secure-channel authentication. It excludes the incoming hop, forwards unchanged opaque ciphertext to one other connected, secure peer, and waits for that peer's encrypted queue acknowledgement before removing the local packet.
+- The next-hop acknowledgement proves that the peer accepted or already had the envelope in its local queue; it is not proof of final-recipient delivery or display.
+- The chat does not yet create destination-decryptable end-to-end envelopes for offline recipients. A direct BLE/Wi-Fi chat's session key is not a durable destination key for a disconnected peer. Therefore app-originated multi-hop message delivery is not available, despite the transport bridge and policy tests.
+- Native Android scheduling, battery-safe background relay, durable forwarding leases, and multi-worker claim coordination are not implemented. Keep one forwarding bridge per app instance.
+- Relay opt-in is stored in the local profile and is off by default. It can be paused from the Mesh Network screen.
 
-A native transport must pass an already-encrypted envelope to `receive()`, call `prepareForward()`, send the returned envelope, and call `markForwarded()` only after a transport-level success. A transport success is not proof that the final recipient displayed the message.
+The bridge sends relayed packets inside the existing per-hop secure channel; it does not introduce a second encryption scheme and never decrypts the inner ciphertext.

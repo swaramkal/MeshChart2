@@ -184,7 +184,11 @@
   body.in-chat .message-list { padding: 12px 0; }
 }
 
-/* Multi-transport / calls / LoRa capability panels */
+/* Multi-transport and local radio status */
+.transport-status-strip{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.transport-status-strip span{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+.transport-status-strip strong{color:var(--text);font-size:11px}
+.relay-control{margin-top:24px}
 .transport-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0 24px}
 .transport-card{display:flex;gap:16px;align-items:flex-start;padding:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#131f33,#111a2a)}
 .transport-icon{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:15px;background:#20364c;color:var(--cyan);font-size:24px}
@@ -194,3 +198,57 @@
 .capability-state.pending{background:#4b3b1e;color:#ffd58a}
 .capability-state.info{background:#1d3547;color:#9bdcff}
 @media(max-width:760px){.transport-grid{grid-template-columns:1fr}.transport-card{padding:16px}}
+
+.call-modal{text-align:center}.call-avatar{width:84px;height:84px;margin:6px auto 14px;font-size:34px;border-radius:28px}.call-modal h2{margin:0}.call-modal p{margin:8px 0 20px}.call-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.call-actions button{min-width:96px;min-height:46px}.call-actions .hidden{display:none!important}.call-row .primary-button{padding:9px 14px}
+
+/* ===== MeshChat v2 theme: WhatsApp-style, mobile first ===== */
+:root{--bg:#111b21;--panel:#202c33;--panel2:#202c33;--line:#2a3942;--muted:#8696a0;--text:#e9edef;--cyan:#00a884;--violet:#00a884;--green:#25d366;--danger:#f15c6d;--bubble-out:#005c4b;--bubble-in:#202c33;--wallpaper:#0b141a;--bar:#202c33;--tick-read:#53bdeb;--shadow:0 8px 30px #0006;background:var(--bg)}
+.light{--bg:#ffffff;--panel:#f0f2f5;--panel2:#f0f2f5;--line:#e9edef;--muted:#667781;--text:#111b21;--cyan:#008069;--violet:#008069;--green:#25d366;--bubble-out:#d9fdd3;--bubble-in:#ffffff;--wallpaper:#efeae2;--bar:#008069}
+body{background:var(--bg)}
+.sidebar,.light .sidebar{background:var(--bg)}
+.topbar{background:var(--bar);border:0;height:56px;padding:0 14px;margin:0 -16px;color:#fff}
+.light .topbar{color:#fff}
+.topbar .topbar-context,.topbar .icon-button,.mobile-brand strong{color:#fff}
+.brand-mark{background:#25d366;color:#073b2e;box-shadow:none}
+.primary-button,.send-button{background:var(--cyan);color:#fff;box-shadow:none}
+.light .primary-button,.light .send-button{color:#fff}
+.secondary-button{background:var(--panel);border:1px solid var(--line);color:var(--text)}
+.page-heading h1,.welcome h1{letter-spacing:-.5px}
+.welcome h1 span{background:none;color:var(--cyan)}
+.avatar{border-radius:50%;background:#6b7c85;color:#fff}
+.avatar-self{background:var(--cyan)}
+.chat-item{padding:12px 10px;min-height:68px;border-bottom:1px solid var(--line);border-radius:0}
+.chat-item:hover,.chat-item.selected,.light .chat-item:hover,.light .chat-item.selected{background:var(--panel)}
+.chat-item .avatar{width:50px;height:50px;font-size:18px}
+.chat-item-top strong{font-size:16px}
+.chat-preview,.chat-item .chat-time{font-size:13px}
+.chat-item.has-unread .chat-time{color:var(--green)}
+.conversation-header{background:var(--bar);margin:0 -16px;padding:8px 12px;border:0;color:#fff}
+.conversation-header .icon-button,.conversation-person small{color:#ffffffcc}
+.conversation-person strong{font-size:17px}
+.message-list{background:var(--wallpaper);margin:0 -16px;padding:14px 12px}
+.message-bubble{font-size:15px;line-height:1.45;border-radius:10px;padding:7px 10px 6px;background:var(--bubble-in);color:var(--text);box-shadow:0 1px 1px #0003}
+.outgoing .message-bubble,.light .outgoing .message-bubble{background:var(--bubble-out);color:var(--text)}
+.incoming .message-bubble,.light .incoming .message-bubble{background:var(--bubble-in)}
+.message-bubble small{color:var(--muted);font-size:11px}
+.tick.delivered{color:var(--tick-read)}
+.day-separator span,.light .day-separator span{background:var(--panel);color:var(--muted);font-size:12px}
+.composer,.light .composer{background:var(--bar);border:0;border-radius:0;margin:0 -16px;padding:8px 10px;gap:8px}
+.composer input{background:var(--bg);color:var(--text);border-radius:22px;padding:11px 14px;font-size:16px;min-height:44px}
+.light .composer{background:var(--panel)}
+.send-button{width:46px;height:46px;border-radius:50%}
+.composer-note{background:var(--bar);margin:0 -16px;color:var(--muted)}
+.notice,.light .notice{background:var(--panel);color:var(--cyan)}
+.settings-card,.peer-list,.discovery-card,.light .discovery-card,.transport-card{background:var(--bg);border-color:var(--line)}
+.discovery-card{background:var(--panel)}
+.modal,.light .modal{background:var(--bg);color:var(--text);border-radius:16px}
+.modal input,.light .modal input{background:var(--panel);color:var(--text);border-color:var(--line)}
+.mobile-bottom-nav,.light .mobile-bottom-nav{background:var(--bg);border-top:1px solid var(--line)}
+.mobile-bottom-nav .nav-link{color:var(--muted);min-height:56px;font-size:12px}
+.mobile-bottom-nav .nav-link.active{color:var(--cyan);background:transparent}
+.mobile-bottom-nav .nav-link.active .mobile-tab-icon{background:#00a88426;border-radius:14px;padding:2px 14px}
+.nav-link.active{background:var(--panel);color:var(--cyan)}
+.call-modal{background:#0b141a;color:#fff}.call-actions .danger-button{background:#f15c6d;color:#fff}
+.toast{background:var(--panel);color:var(--text);border-color:var(--line)}
+@media(max-width:850px){.send-button,.icon-button{min-width:44px;min-height:44px}.topbar{margin:0 -22px;padding:0 14px}}
+@media(max-width:560px){.topbar{margin:0 -16px}.settings-row strong{font-size:15px}.settings-row small{font-size:12px}.peer-copy strong{font-size:15px}.peer-copy small{font-size:12px}.page-heading h1{font-size:28px}}

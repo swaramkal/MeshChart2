@@ -27,11 +27,11 @@ The uploaded `README.md` says the native Android BLE plugin is not yet implement
 
 The uploaded README refers to `.github/workflows/android-build.yml`, but the ZIP contains `.github/workflows/android-apk.yml` and `.github/workflows/deploy.yml`. Update the documentation to describe the workflow files that actually exist.
 
-The uploaded `BUILD-STATUS.md` says the Vite production bundle had not been run. In the current working project during this conversation, `npm test` passed 11 tests and `npm run build` passed on 2026-11-22. Update the build report only after preserving the actual command output and commit context.
+The uploaded `BUILD-STATUS.md` was stale. In this workspace on 2026-11-24, `npm test` passed 77 tests, `npm run build` passed, and `npx cap sync android` passed. Android Gradle/APK compilation remains unverified because Java and Android SDK tools are unavailable.
 
 The uploaded `docs/ROADMAP.md` is a useful starting point, but it does not reflect the newer packet-transport work described in the current working project.
 
-## 3. Current working-project status reported in this conversation
+## 3. Historical working-project status reported on 2026-11-22 (superseded by the current follow-up above)
 
 | Feature | Status |
 |---|---|
@@ -71,7 +71,7 @@ A stage can be marked complete only when:
 
 Finish and verify the native BLE packet transport before building more features on top of it. In particular, review notification queue recovery, callback ordering, disconnect/reconnect behavior, MTU reset, and server lifecycle handling. Then compile the Android app through the existing GitHub Actions workflow and test with two Android devices before moving to the full encrypted messaging stage.
 
-## 2026-11-24 update
+## Earlier 2026-11-24 archive-state snapshot (superseded by the current follow-up audit)
 
 | Capability | Current status |
 |---|---|
