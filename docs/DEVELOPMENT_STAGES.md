@@ -1,6 +1,6 @@
 # MeshChat Development Stages
 
-Stages are ordered by dependency. Complete and verify each stage before moving to the next. Status reflects the uploaded ZIP plus the current working-project information shared in this conversation on 2026-11-22.
+Stages are ordered by dependency. Complete and verify each stage before moving to the next. Status reflects the uploaded ZIP plus source changes and automated validation completed in this workspace on 2026-11-24. Native build and device behavior remain unverified where noted.
 
 ## Stage 0 — Project baseline and documentation
 
@@ -25,7 +25,7 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 ### Work
 - First-launch display-name prompt.
 - Local profile persistence.
-- Use the chosen name for BLE discovery/advertising where supported.
+- Use the chosen name for BLE and Wi-Fi Direct discovery/advertising where supported.
 - Settings screen to change the name.
 - Fallback behavior for missing or invalid names.
 
@@ -56,7 +56,7 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 
 ## Stage 3 — Packet framing, fragmentation, and reliable BLE transport
 
-**Status:** In progress in the current working project
+**Status:** Packet tests pass; native compilation and Android device acceptance remain pending
 
 ### Work
 - Finalize the bounded packet frame and packet-ID rules.
@@ -79,7 +79,7 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 
 ## Stage 4 — Secure private messaging
 
-**Status:** Crypto primitives exist; end-to-end integration remains
+**Status:** Direct one-to-one authenticated encrypted messaging is integrated in source and unit-tested; native/device acceptance and at-rest protection remain
 
 ### Work
 - Define the versioned encrypted message envelope.
@@ -99,7 +99,7 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 
 ## Stage 5 — Message lifecycle, acknowledgements, and history
 
-**Status:** Local persistence exists; reliable remote delivery state remains
+**Status:** Local persistence, authenticated app-level acknowledgements, message-ID deduplication, and truthful delivery ticks are implemented in source; native/device acceptance remains
 
 ### Work
 - Integrate chat messages with the real transport.
@@ -118,7 +118,7 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 
 ## Stage 6 — Mesh relay and store-and-forward
 
-**Status:** Not implemented
+**Status:** Opaque-envelope policy and secure next-hop bridge are implemented in source and unit-tested; destination key flow and real multi-hop chat delivery remain incomplete
 
 ### Work
 - Add opt-in relay mode.
@@ -132,6 +132,10 @@ Stages are ordered by dependency. Complete and verify each stage before moving t
 - Hop limit, expiry, quotas, and deduplication are enforced.
 - Relay opt-out prevents forwarding.
 - No infinite forwarding loops occur in multi-device tests.
+
+## Stage 6A — Wi-Fi Direct native transport
+
+**Status:** Native source and JavaScript adapter are present; native compilation and two-device verification are pending.
 
 ## Stage 7 — Group messaging
 

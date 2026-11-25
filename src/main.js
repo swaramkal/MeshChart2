@@ -2,8 +2,12 @@ import './styles.css';
 import { MeshDatabase } from './services/database.js';
 import { CryptoService } from './services/crypto.js';
 import { BluetoothAdapter } from './services/bluetooth.js';
+import { WifiDirectAdapter } from './services/wifi-direct.js';
+import { TransportManager } from './services/transport-manager.js';
 import { ChatController } from './services/chat.js';
 import { PairingController } from './services/pairing.js';
+import { RelayService } from './services/relay.js';
+import { RelayTransportBridge } from './services/relay-transport.js';
 import { sealPayload, openPacket } from './services/secure-channel.js';
 import {
   formatListTime,
@@ -19,9 +23,12 @@ import {
 
 const $ = (selector) => document.querySelector(selector);
 const db = new MeshDatabase();
-const bluetooth = new BluetoothAdapter();
+const bleAdapter = new BluetoothAdapter();
+const wifiDirectAdapter = new WifiDirectAdapter();
+const bluetooth = new TransportManager({ bluetooth: bleAdapter, wifiDirect: wifiDirectAdapter });
 const cryptoService = new CryptoService();
 const chat = new ChatController(db);
+const relay = new RelayService(db);
 let activeView = 'chats';
 let scanning = false;
 let onboardingRequired = false;
@@ -55,7 +62,7 @@ function pairingStatusText(status, trusted = false) {
     secure: 'Secure pairing confirmed. Encrypted one-to-one messaging is ready.',
     timeout: 'Pairing timed out. Reconnect and try again.',
     failed: 'Pairing failed. Please reconnect and try again.',
-    disconnected: 'Bluetooth disconnected. Pairing was cancelled.',
+    disconnected: 'Peer disconnected. Pairing was cancelled.',
     'peer-cancelled': 'The other device cancelled pairing.',
     'verification-failed': 'Verification failed. Pair again.',
     cancelled: 'Pairing cancelled.',
@@ -130,6 +137,7 @@ async function handleSecured(peerId, session) {
       (c) => c.fingerprint === session.remoteFingerprint && c.peerId !== peerId
     );
 
+    bluetooth.associateIdentity(peerId, session.remoteFingerprint);
     await db.saveConversation({
       peerId,
       peerName: session.peerName || 'Nearby MeshChat device',
@@ -138,16 +146,21 @@ async function handleSecured(peerId, session) {
     });
 
     if (previous) {
-      // The contact came back from a new Bluetooth address: keep one thread.
+      // A verified contact can reappear under a different transport address.
       await db.mergeConversation(previous.peerId, peerId);
       if (chat.activePeerId === previous.peerId) chat.activePeerId = peerId;
     }
 
     await chat.load();
     renderChatList();
+    await relayBridge.forward();
 
     if (chat.activePeerId === peerId) {
-      $('#conversation-status').textContent = 'Secure paired · encrypted chat';
+      $('#conversation-name').textContent = session.peerName || 'Nearby MeshChat device';
+      $('#conversation-avatar').textContent = initials(session.peerName || 'Nearby MeshChat device');
+      const transport = bluetooth.getConnectionType(peerId);
+      const transportLabel = transport === 'wifi-direct' ? 'Wi-Fi Direct' : 'Bluetooth LE';
+      $('#conversation-status').textContent = `Secure paired · encrypted chat · ${transportLabel}`;
       await renderMessages();
     }
   } catch (error) {
@@ -165,7 +178,22 @@ const pairing = new PairingController(bluetooth, {
   onState: renderPairingState,
   onSecure: handleSecured,
   getIdentity: getLocalIdentity,
+  getDisplayName: async () => (await db.getProfile()).name || 'MeshChat',
   findTrusted: findTrustedContact
+});
+
+const relayBridge = new RelayTransportBridge({
+  relay,
+  getPeers: () => bluetooth.getPeers()
+    .filter((peer) => peer.connected && pairing.getSecureSession(peer.id))
+    .map((peer) => ({
+      ...peer,
+      fingerprint: bluetooth.getPeerFingerprint(peer.id) || peer.identityFingerprintHint || peer.id
+    })),
+  sendEnvelope: (peerId, envelope) => sendSecurePayload(peerId, {
+    kind: 'relay-envelope',
+    envelope
+  })
 });
 
 // Encrypt every chat payload using the key established by verified pairing.
@@ -325,10 +353,16 @@ async function openConversation(peerId) {
   $('#conversation-avatar').style.background =
     `hsl(${avatarHue(conversation.peerName)} 42% 38%)`;
 
+  const activeTransport = bluetooth.getConnectionType(peerId);
+  const transportLabel = activeTransport === 'wifi-direct'
+    ? 'Wi-Fi Direct'
+    : activeTransport === 'bluetooth'
+      ? 'Bluetooth LE'
+      : 'Nearby';
   $('#conversation-status').textContent = pairing.isSecure(peerId)
-    ? 'Secure paired · encrypted chat'
+    ? `Secure paired · encrypted chat · ${transportLabel}`
     : conversation.connected
-      ? 'Connected nearby · pairing required'
+      ? `Connected over ${transportLabel} · pairing required`
       : 'Saved conversation · not connected';
 
   await chat.markRead(peerId);
@@ -380,12 +414,13 @@ function renderPeers(peers) {
         <span class="avatar">${escapeHTML(initials(p.name))}</span>
         <div class="peer-copy">
           <strong>${escapeHTML(p.name)}</strong>
-          <small>${escapeHTML(p.id)}</small>
+          <small>${escapeHTML(p.transport === 'wifi-direct' ? 'Wi-Fi Direct' : 'Bluetooth LE')}</small>
         </div>
         <span class="peer-signal">${p.connected ? 'Connected' : 'Nearby'}</span>
         <button class="secondary-button connect-peer"
           data-peer="${escapeHTML(p.id)}"
-          data-name="${escapeHTML(p.name)}">Connect</button>
+          data-name="${escapeHTML(p.name)}"
+          data-transport="${escapeHTML(p.transport || 'bluetooth')}">Connect</button>
       </div>
     `).join('')
     : '<div class="empty-state">No devices discovered yet.</div>';
@@ -406,28 +441,31 @@ function schedulePeerRender() {
 async function connectToPeer(button) {
   const peer = {
     id: button.dataset.peer,
-    name: button.dataset.name
+    name: button.dataset.name,
+    transport: button.dataset.transport
   };
 
   button.disabled = true;
 
   try {
-    await bluetooth.connect(peer.id);
+    const connection = await bluetooth.connect(peer.id, peer.transport);
+    const connectedPeerId = connection?.deviceId || peer.id;
+    const connectedPeerName = connection?.deviceName || peer.name;
     await db.saveConversation({
-      peerId: peer.id,
-      peerName: peer.name,
+      peerId: connectedPeerId,
+      peerName: connectedPeerName,
       connected: true
     });
     await chat.load();
 
-    activePairingPeerId = peer.id;
-    await pairing.start(peer.id, peer.name);
+    activePairingPeerId = connectedPeerId;
+    await pairing.start(connectedPeerId, connectedPeerName);
 
     renderChatList();
-    await openConversation(peer.id);
-    toast('Connected. Securing the connection…');
+    await openConversation(connectedPeerId);
+    toast(`Connected over ${connection?.transport === 'wifi-direct' ? 'Wi-Fi Direct' : 'Bluetooth'}. Securing the connection…`);
   } catch (error) {
-    toast(error.message || 'Bluetooth connection failed.');
+    toast(error.message || 'Nearby connection failed.');
   } finally {
     button.disabled = false;
   }
@@ -441,6 +479,51 @@ async function refreshProfile() {
   $('#name-field').value = name;
   $('#profile-edit').title = 'Edit profile';
   return { ...profile, name };
+}
+
+function renderRelayStatus() {
+  const enabled = relay.enabled;
+  $('#relay-status').textContent = enabled
+    ? 'Opted in locally. This build cannot forward app messages yet.'
+    : 'Relay is paused on this device.';
+  $('#relay-toggle').textContent = enabled ? 'Pause relay' : 'Enable relay';
+  $('#relay-toggle').setAttribute('aria-pressed', String(enabled));
+}
+
+async function toggleRelayParticipation() {
+  const profile = await db.getProfile();
+  const enabled = !relay.enabled;
+  await db.saveProfile({ ...profile, relayEnabled: enabled });
+  relay.setEnabled(enabled);
+  renderRelayStatus();
+  if (enabled) await relayBridge.forward();
+  toast(enabled ? 'Relay preference saved. Only accepted encrypted envelopes can be forwarded.' : 'Relay participation paused.');
+}
+
+function updateTransportStatus(transport, status) {
+  const element = transport === 'wifi-direct'
+    ? $('#wifi-direct-status')
+    : transport === 'bluetooth'
+      ? $('#bluetooth-status')
+      : null;
+  if (!element) return;
+
+  let label = 'Checking';
+  if (status?.error) label = 'Action needed';
+  else if (status?.state === 'native-adapter-required') label = 'Android app required';
+  else if (status?.supported === false || status?.available === false) label = 'Unavailable';
+  else if (status?.permissionGranted === false) label = 'Permission needed';
+  else if (status?.enabled === false) label = transport === 'wifi-direct' ? 'Wi-Fi off' : 'Bluetooth off';
+  else if (status?.enabled === true || status?.available === true) label = 'Ready';
+  element.textContent = label;
+  element.title = status?.detail || '';
+}
+
+async function refreshTransportStatus() {
+  const statuses = await bluetooth.getStatus();
+  for (const [transport, status] of Object.entries(statuses)) {
+    updateTransportStatus(transport, status);
+  }
 }
 
 function openProfileDialog(firstLaunch = false) {
@@ -467,9 +550,12 @@ async function saveProfile(event) {
     button.style.display = '';
   });
   $('#profile-dialog').close();
-  await refreshProfile();
+  const profile = await refreshProfile();
 
   try {
+    const identity = await getLocalIdentity();
+    const fingerprint = await cryptoService.fingerprintOf(identity.publicKeySpki);
+    bluetooth.setIdentity({ peerId: fingerprint, fingerprint, displayName: profile.name });
     await bluetooth.updateDisplayName(name);
   } catch (error) {
     console.warn('Unable to refresh BLE display name:', error);
@@ -483,6 +569,14 @@ async function saveProfile(event) {
 async function init() {
   await db.open();
   const savedProfile = await refreshProfile();
+  relay.setEnabled(savedProfile.relayEnabled === true);
+  renderRelayStatus();
+  await chat.load();
+  for (const conversation of chat.conversations) {
+    if (conversation.connected) {
+      await db.saveConversation({ ...conversation, connected: false }, { touch: false });
+    }
+  }
   await chat.load();
   renderChatList();
   $('#network-state').textContent = 'Ready · offline mode';
@@ -543,12 +637,31 @@ async function init() {
   document.querySelectorAll('.nav-link').forEach((el) =>
     el.addEventListener('click', () => setView(el.dataset.view))
   );
+  $('#relay-toggle').addEventListener('click', toggleRelayParticipation);
   $('#export-data').addEventListener('click', exportData);
   $('#clear-data').addEventListener('click', clearData);
   $('#mobile-menu')?.addEventListener('click', () =>
     document.querySelector('.sidebar')?.classList.toggle('mobile-open')
   );
-  bluetooth.onPeer(() => schedulePeerRender());
+  bluetooth.onPeer(() => {
+    schedulePeerRender();
+    relayBridge.forward().catch((error) => console.warn('Relay forwarding is unavailable:', error));
+  });
+  bluetooth.onDisconnect(async (peerId) => {
+    const fingerprint = bluetooth.getPeerFingerprint(peerId) ||
+      (/^[a-f0-9]{64}$/i.test(String(peerId)) ? String(peerId).toLowerCase() : null);
+    const conversation = chat.getConversation(peerId) ||
+      chat.conversations.find((item) => item.fingerprint === fingerprint);
+    if (!conversation) return;
+    await db.saveConversation({ ...conversation, connected: false }, { touch: false });
+    await chat.load();
+    renderChatList();
+    if (chat.activePeerId === conversation.peerId) {
+      $('#conversation-status').textContent = 'Saved conversation · not connected';
+    }
+  });
+  bluetooth.onStatus((status) => updateTransportStatus(status.transport, status));
+  await refreshTransportStatus();
 
   const peerList = $('#peer-list');
   peerList.addEventListener('pointerdown', () => { peerListPressed = true; });
@@ -617,12 +730,29 @@ async function init() {
     if (!data || !peerId) return;
 
     try {
-      const session = pairing.getSecureSession(peerId);
+      const session = pairing.getSecureSessionForPacket(peerId, data);
       if (!session) return;
+      bluetooth.associateIdentity(peerId, session.remoteFingerprint);
 
       // Returns null for pairing traffic; throws on forged or replayed data.
       const payload = await openPacket(cryptoService, session, data);
       if (!payload) return;
+
+      if (payload.kind === 'relay-envelope') {
+        const result = await relayBridge.receive(payload.envelope, peerId);
+        if (result.reason === 'queued' || result.reason === 'duplicate') {
+          await sendSecurePayload(peerId, {
+            kind: 'relay-ack',
+            id: payload.envelope.id
+          });
+        }
+        return;
+      }
+
+      if (payload.kind === 'relay-ack' && typeof payload.id === 'string') {
+        await relayBridge.acknowledge(payload.id, peerId);
+        return;
+      }
 
       if (payload.kind === 'ack' && typeof payload.id === 'string') {
         await chat.updateMessageStatus(payload.id, 'delivered');
@@ -634,6 +764,8 @@ async function init() {
       if (
         payload.kind !== 'text' ||
         typeof payload.id !== 'string' ||
+        payload.id.length < 1 || payload.id.length > 80 ||
+        !/^[A-Za-z0-9_-]+$/.test(payload.id) ||
         typeof payload.text !== 'string' ||
         !payload.text.trim()
       ) {
@@ -650,7 +782,13 @@ async function init() {
         await chat.load();
       }
 
-      await chat.addMessage(peerId, payload.text, 'in', 'delivered');
+      const received = await chat.addMessage(
+        peerId,
+        payload.text,
+        'in',
+        'delivered',
+        { messageId: payload.id }
+      );
 
       // Send a cryptographically protected receipt to the sender.
       await sendSecurePayload(peerId, {
@@ -658,8 +796,10 @@ async function init() {
         id: payload.id
       });
 
-      if (chat.activePeerId === peerId) await renderMessages();
-      renderChatList();
+      if (!received.duplicate) {
+        if (chat.activePeerId === peerId) await renderMessages();
+        renderChatList();
+      }
     } catch (error) {
       console.error('Encrypted message processing failed:', error);
     }
@@ -689,6 +829,13 @@ async function startScan() {
   }
   try {
     const profile = await db.getProfile();
+    const identity = await getLocalIdentity();
+    const fingerprint = await cryptoService.fingerprintOf(identity.publicKeySpki);
+    bluetooth.setIdentity({
+      peerId: fingerprint,
+      fingerprint,
+      displayName: profile.name || 'MeshChat'
+    });
     await bluetooth.startScan(profile.name || 'MeshChat');
     scanning = true;
     $('#scan-button').textContent = 'Stop discovery';
@@ -696,9 +843,9 @@ async function startScan() {
     $('#discovery-description').textContent =
       'Keep this screen open while MeshChat searches nearby.';
   } catch (error) {
-    toast(error.message || 'Bluetooth discovery is unavailable in this browser.');
+    toast(error.message || 'Nearby radio discovery is unavailable here.');
     $('#discovery-description').textContent =
-      'Use the Android app on a supported device to enable native Bluetooth discovery.';
+      'Use MeshChat on a supported Android device and enable Bluetooth or Wi-Fi Direct.';
   }
 }
 
@@ -715,7 +862,7 @@ async function sendMessage(event) {
     return;
   }
 
-  // Leave room for JSON and AES-GCM overhead in the BLE packet limit.
+  // Keep encrypted envelopes within the current shared secure-channel size cap.
   if (new TextEncoder().encode(text).length > 1400) {
     toast('Message is too long for this development build.');
     return;
@@ -740,7 +887,7 @@ async function sendMessage(event) {
     renderChatList();
     toast('Encrypted message sent. Waiting for receipt…');
   } catch (error) {
-    console.error('Encrypted BLE send failed:', error);
+    console.error('Encrypted transport send failed:', error);
     await chat.updateMessageStatus(message.id, 'failed');
     await renderMessages();
     renderChatList();
@@ -780,6 +927,9 @@ async function clearData() {
   if (!confirm('Delete all MeshChat local data from this device? This cannot be undone.'))
     return;
   await db.clear();
+  relay.setEnabled(false);
+  relayBridge.destroy();
+  renderRelayStatus();
   pairing.reset();
   identityPromise = null;
   lastPeerSignature = null;

@@ -106,7 +106,25 @@ Use this checklist for every stage. Keep the test result, date, Android version,
 - [ ] Process death/restart behavior is tested.
 - [ ] Battery impact is measured on real devices.
 
-## J. Privacy, accessibility, and release
+## J. Two-phone and three-phone runbook
+
+The test below must be run on physical Android phones; JavaScript tests cannot emulate radio discovery, permission dialogs, Wi-Fi Direct group negotiation, audio devices, or Android background policy.
+
+### Install and two-phone direct messaging
+1. Build a debug APK with the repository's `android-apk.yml` workflow (the current workspace could not produce one because it lacks a JDK and Android SDK), download the artifact, and install the same APK on two phones. Android may require enabling “Allow from this source” for the app used to open the APK; disable that allowance after installation if desired.
+2. On both phones, launch MeshChat and set different display names. Keep Wi-Fi and Bluetooth enabled, but turn off mobile data and avoid connecting to an internet router. Wi-Fi Direct needs Wi-Fi radio enabled, not an internet connection.
+3. Open Nearby devices. Grant Bluetooth permissions when BLE is tested. For Wi-Fi Direct grant Nearby Wi-Fi Devices on Android 13+; on Android 12L and lower grant Fine Location and enable Location Mode if required by the OS.
+4. Confirm each phone lists the other under the user-selected name and transport label. Connect, compare the six-digit code in person, and confirm on both phones.
+5. Exchange messages in both directions, including a short message and a message larger than one radio frame. Confirm the sender changes to “delivered” only after the receiver app acknowledges it. Disconnect, reconnect, repeat, and record Android version/model, radio, and outcome.
+6. Repeat with Bluetooth selected. Do not assume a Wi-Fi result validates BLE, or vice versa.
+
+### Three-phone relay limitation
+The relay policy and secure next-hop bridge have automated tests, but the application does not yet create destination-decryptable envelopes for offline recipients. Do not report Phone A → Phone B → Phone C app-message delivery as passing; the current release has no usable origin-to-destination relay key flow. Once implemented, test A and C paired first, put B between them, opt B into relay, keep all phones offline from the internet, then verify ciphertext is forwarded and only C displays plaintext. Also test relay opt-out, duplicate envelopes, expiry, and hop exhaustion.
+
+### Voice limitation
+Voice-call UI remains disabled. No two-way voice test can pass in this build because call signaling and media capture/playback have not been implemented. Do not count BLE packets or a Wi-Fi socket connection as audio transmission.
+
+## K. Privacy, accessibility, and release
 
 - [ ] Blocked peer cannot send accepted messages.
 - [ ] Discovery visibility setting works.

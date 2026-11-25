@@ -941,6 +941,7 @@ public class MeshBlePlugin extends Plugin {
                 int status,
                 int newState
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     rejectPendingConnect(
                         address,
@@ -993,6 +994,7 @@ public class MeshBlePlugin extends Plugin {
                 int mtu,
                 int status
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     negotiatedMtus.put(address, mtu);
                 }
@@ -1005,6 +1007,7 @@ public class MeshBlePlugin extends Plugin {
                 BluetoothGatt gatt,
                 int status
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     rejectPendingConnect(
                         address,
@@ -1086,6 +1089,7 @@ public class MeshBlePlugin extends Plugin {
                 BluetoothGattDescriptor descriptor,
                 int status
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (!CCCD_UUID.equals(descriptor.getUuid())) return;
 
                 if (status != BluetoothGatt.GATT_SUCCESS) {
@@ -1114,6 +1118,7 @@ public class MeshBlePlugin extends Plugin {
                 BluetoothGatt gatt,
                 BluetoothGattCharacteristic characteristic
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (TX_CHAR_UUID.equals(characteristic.getUuid())) {
                     byte[] value = characteristic.getValue();
 
@@ -1129,6 +1134,7 @@ public class MeshBlePlugin extends Plugin {
                 BluetoothGattCharacteristic characteristic,
                 byte[] value
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (TX_CHAR_UUID.equals(characteristic.getUuid())
                     && value != null) {
 
@@ -1142,6 +1148,7 @@ public class MeshBlePlugin extends Plugin {
                 BluetoothGattCharacteristic characteristic,
                 int status
             ) {
+                if (!isCurrentGatt(address, gatt)) return;
                 if (!RX_CHAR_UUID.equals(characteristic.getUuid())) return;
 
                 PluginCall call = pendingWriteCalls.remove(address);
@@ -1163,6 +1170,7 @@ public class MeshBlePlugin extends Plugin {
         BluetoothGatt gatt,
         String address
     ) {
+        if (!isCurrentGatt(address, gatt)) return;
         try {
             if (!gatt.discoverServices()) {
                 rejectPendingConnect(
@@ -1200,12 +1208,17 @@ public class MeshBlePlugin extends Plugin {
         }
     }
 
+    private boolean isCurrentGatt(String address, BluetoothGatt gatt) {
+        return activeGatts.get(address) == gatt;
+    }
+
     private void closeGatt(
         String address,
         BluetoothGatt gatt
     ) {
-        activeGatts.remove(address);
-        negotiatedMtus.remove(address);
+        if (activeGatts.remove(address, gatt)) {
+            negotiatedMtus.remove(address);
+        }
 
         try {
             gatt.close();

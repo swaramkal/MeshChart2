@@ -24,12 +24,12 @@ export class ChatController {
     return this.db.getMessages(peerId);
   }
 
-  async addMessage(peerId, text, direction = 'out', status = 'queued') {
+  async addMessage(peerId, text, direction = 'out', status = 'queued', { messageId } = {}) {
     const conversation = this.getConversation(peerId);
     if (!conversation) throw new Error('Conversation not found.');
 
     const message = {
-      id: crypto.randomUUID(),
+      id: messageId || crypto.randomUUID(),
       peerId,
       text,
       direction,
@@ -37,12 +37,21 @@ export class ChatController {
       status,
     };
 
+    if (this.db.saveMessageIfAbsent) {
+      const inserted = await this.db.saveMessageIfAbsent(message);
+      if (!inserted) {
+        const existing = await this.db.getMessage?.(message.id);
+        return existing ? { ...existing, duplicate: true } : { ...message, duplicate: true };
+      }
+    } else {
+      await this.db.saveMessage(message);
+    }
+
     const beingViewed = this.activePeerId === peerId && this.isVisible();
     const unread = direction === 'in' && !beingViewed
       ? (Number(conversation.unread) || 0) + 1
       : (beingViewed ? 0 : Number(conversation.unread) || 0);
 
-    await this.db.saveMessage(message);
     await this.db.saveConversation({
       ...conversation,
       lastMessage: text,

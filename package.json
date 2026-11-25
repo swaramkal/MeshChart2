@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Offline-first Android peer-to-peer messenger with modular Bluetooth, Wi-Fi Aware and Meshtastic integration roadmap",
+  "description": "Offline-first Android peer-to-peer messenger with Bluetooth LE, Wi-Fi Direct, secure pairing, and local-first storage",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",

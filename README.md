@@ -1,24 +1,22 @@
 # MeshChart2
 
 
-Android-first offline messenger. This repository contains the existing MeshChat app, its Bluetooth Low Energy foundation, secure pairing code, packet framing, and a newly added transport-independent relay policy module.
+Android-first offline messenger. This repository preserves the existing MeshChat app, Bluetooth Low Energy foundation, secure pairing, and packet framing, and adds a native Android Wi-Fi Direct/TCP transport plus a unified transport manager. Source and automated tests do not replace two-phone acceptance testing.
 
-## Current verified source status
+## Current implementation status
 
-- App shell, local profile/storage, pairing, and secure-channel code are present.
-- Native Android BLE GATT plugin and JavaScript BLE adapter are present in source; real-device interoperability still needs testing.
-- Packet framing and fragmentation utilities are present and unit-tested.
-- Relay policy core is implemented and unit-tested: explicit opt-in, bounded opaque packet envelopes (the caller must supply end-to-end ciphertext), expiry, hop limits, deduplication, queue quotas, and forwarding acknowledgement lifecycle.
-- IndexedDB schema v3 includes persistent relay queue and deduplication stores.
-- A GitHub Actions workflow builds a debug APK after tests pass.
+- App shell, local profile, IndexedDB conversations, secure pairing, AES-GCM message transport, replay window, and BLE GATT plugin are retained.
+- Native `WifiP2pManager` discovery uses a MeshChat DNS-SD service record, creates a P2P group, then exchanges bounded length-prefixed packets over local TCP sockets. This code has not been compiled or exercised on Android hardware in this workspace.
+- The JavaScript transport manager prefers Wi-Fi Direct, falls back to Bluetooth for the same peer identity where a secure session is available, deduplicates application message IDs, and retries reconnects a bounded number of times.
+- The opt-in relay bridge forwards opaque envelopes over the existing authenticated/encrypted peer session and waits for a hop acknowledgement. The chat still lacks a destination encryption-key protocol to create decryptable end-to-end envelopes, so user-message multi-hop delivery is not available.
+- JavaScript unit coverage includes transport selection, reconnect, duplicate prevention, relay expiry/hops/quotas/acknowledgements, and Wi-Fi adapter packet events.
 
 ## Not yet working / not verified
 
-- Relay core is not connected to BLE or Wi-Fi transports, so multi-hop phone-to-phone relay is not operational.
-- Native Wi-Fi Direct / Wi-Fi Aware transport is not implemented.
-- Offline voice-call signaling and audio are not implemented.
-- The latest Android APK workflow has not yet been run in GitHub Actions.
-- Two-device Android acceptance testing has not been completed.
+- End-to-end destination encryption for offline relayed chat messages is not implemented; the relay bridge only forwards envelopes supplied by a caller.
+- Voice-call signaling, audio capture/playback, codec, and encrypted media are not implemented. Calls remain disabled; BLE GATT is not an audio path.
+- Android compilation is blocked in this workspace because Java/JDK and Android SDK are absent. The GitHub Actions APK workflow was preserved but not run.
+- BLE/Wi-Fi Direct interoperability, Android 13–16 permission behavior, reconnect behavior, multi-hop delivery, and real audio have not been tested on physical phones.
 
 ## Build locally
 

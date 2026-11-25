@@ -9,7 +9,7 @@ const plugin = (name) => globalThis.Capacitor?.Plugins?.[name] || null;
 
 export function getTransportCapabilities() {
   const ble = plugin('MeshBle');
-  const wifi = plugin('MeshWifiAware');
+  const wifiDirect = plugin('MeshWifiDirect');
   const lora = plugin('MeshMeshtastic');
 
   return {
@@ -19,11 +19,11 @@ export function getTransportCapabilities() {
       label: 'Bluetooth LE',
       detail: ble ? 'Native BLE adapter detected.' : 'Existing BLE plugin is present in Android source; install/build the native app to use it.'
     },
-    wifiAware: {
-      available: Boolean(wifi),
-      state: wifi ? 'native-adapter-present' : 'native-adapter-required',
-      label: 'Wi-Fi Aware',
-      detail: wifi ? 'Wi-Fi Aware adapter detected.' : 'Requires a dedicated Android Wi-Fi Aware plugin and compatible phones.'
+    wifiDirect: {
+      available: Boolean(wifiDirect),
+      state: wifiDirect ? 'native-adapter-present' : 'native-adapter-required',
+      label: 'Wi-Fi Direct',
+      detail: wifiDirect ? 'Native Android Wi-Fi Direct adapter detected.' : 'Requires the Android app with the MeshWifiDirect plugin and compatible phones.'
     },
     meshtastic: {
       available: Boolean(lora),
@@ -42,8 +42,8 @@ export function getTransportCapabilities() {
 
 export function getCallTransportPlan() {
   return {
-    primary: 'wifi-aware',
+    primary: 'wifi-direct-tcp',
     fallback: 'bluetooth-audio-profile',
-    note: 'Wi-Fi Aware can provide a local IP data path where supported. Bluetooth call audio requires a suitable Bluetooth audio profile; BLE GATT is for control/data, not continuous voice.'
+    note: 'Wi-Fi Direct TCP is the planned local-IP media path. Bluetooth call audio requires a suitable Bluetooth audio profile; BLE GATT is for control/data, not continuous voice.'
   };
 }

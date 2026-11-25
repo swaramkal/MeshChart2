@@ -184,7 +184,11 @@
   body.in-chat .message-list { padding: 12px 0; }
 }
 
-/* Multi-transport / calls / LoRa capability panels */
+/* Multi-transport and local radio status */
+.transport-status-strip{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.transport-status-strip span{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+.transport-status-strip strong{color:var(--text);font-size:11px}
+.relay-control{margin-top:24px}
 .transport-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0 24px}
 .transport-card{display:flex;gap:16px;align-items:flex-start;padding:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#131f33,#111a2a)}
 .transport-icon{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:15px;background:#20364c;color:var(--cyan);font-size:24px}

@@ -1,30 +1,31 @@
 # MeshChat Build Status
 
-Snapshot: multi-transport UI/architecture rebuild
+Snapshot: Wi-Fi Direct and unified transport implementation source update (2026-11-24)
 
-## Present in this ZIP
-- Existing MeshChat web/Capacitor project and Bluetooth BLE code retained.
-- Calls and Mesh Network navigation sections added; no external LoRa radio is required.
-- Multi-transport architecture and staged integration requirements added.
-- Calls/LoRa UI explicitly reports native implementation requirements; no fake operational controls are exposed.
+## Implemented in source
 
-## Not yet implemented / not verified
-- Native Wi-Fi Aware (NAN) transport.
-- Cross-transport message routing and acknowledgements.
-- Voice call signaling and audio media.
-- Two-device BLE acceptance and native Android compilation for this rebuilt snapshot.
+- Existing Vite/Capacitor app shell, local IndexedDB profile/conversations, BLE GATT plugin, secure pairing, AES-GCM secure channel, packet framing, and message acknowledgements retained.
+- Native Android `WifiP2pManager` plugin registered in `MainActivity`; DNS-SD identifies MeshChat peers, with local TCP sockets and bounded length-prefixed packet framing.
+- JavaScript Wi-Fi Direct adapter and unified transport manager added, with preferred transport selection, per-peer fallback, bounded reconnect attempts, and connection status reporting.
+- Application message IDs are saved idempotently to prevent duplicate visible messages across retries.
+- Existing relay policy is connected to secure transport callbacks for opaque envelopes; local relay opt-in is persisted and next-hop acknowledgements gate queue removal.
+- Calls remain explicitly disabled; no call signaling, audio capture/playback, media codec, or encrypted real-time audio has been implemented.
 
-Do not describe this ZIP as a complete working Wi-Fi + Bluetooth + LoRa + calling release until all relevant checks in `TESTING_CHECKLIST.md` pass on real hardware.
+## Automated validation performed
 
+- `npm ci`: passed.
+- Baseline `npm test`: 61 passed, 0 failed before edits.
+- Updated `npm test`: 77 passed, 0 failed (latest run after transport/name tests).
+- `npm run build`: passed; Vite production bundle generated.
+- `npx cap sync android`: passed.
+- `cd android && ./gradlew --no-daemon assembleDebug`: blocked before Gradle execution because Java/JDK is missing; Android SDK environment variables and SDK directories are also absent.
 
-## 2026-11-24 implementation update
+## Not verified / remaining limitations
 
-- Added `src/services/relay.js` with opt-in, bounded opaque packet envelopes, expiry, hop limits, deduplication, queue quotas, and forwarding acknowledgement lifecycle. The caller must supply end-to-end encrypted packet bytes; the relay layer cannot prove arbitrary base64 data is ciphertext.
-- Added IndexedDB schema v3 relay queue and deduplication stores.
-- Added `docs/RELAY.md` and a GitHub Actions Android debug APK workflow.
-- Automated JavaScript tests: 61 passed, 0 failed.
-- Added atomic IndexedDB relay packet reservation across `relayQueue` and `relaySeen`; this closes duplicate-arrival and queue-quota races between concurrent receive callbacks. A concurrency regression test passes. JavaScript syntax checks passed.
-- `npm run build` remains unverified locally because Vite is not installed in the current workspace. `npm ci` timed out in this environment.
-- Relay is not integrated with BLE/Wi-Fi transports; multi-hop phone-to-phone relay is not operational. Wi-Fi Direct/Aware and voice calling remain unimplemented.
+- Native Wi-Fi Direct Java code has not been compiled in this environment; it needs a configured JDK and Android SDK or the preserved Android GitHub Actions workflow.
+- No real Android device test was performed. BLE/Wi-Fi Direct interoperability, Android 13–16 permissions, group formation, local TCP sockets, reconnect, and background/power behavior remain unverified.
+- Relay can forward only opaque envelopes supplied by an upstream caller. The current chat has no destination-key protocol to create decryptable E2E envelopes for an offline final recipient; do not claim usable multi-hop chat delivery.
+- Offline voice calling is not implemented. BLE GATT is not a voice transport; Wi-Fi Direct TCP availability alone does not implement audio.
+- No APK was generated in this workspace. The GitHub Actions workflow is preserved but was not run because this ZIP is not connected to the specified GitHub repository and Android build tools are unavailable locally.
 
-- Replaced the old LoRa radio screen with a Mesh Network screen describing Bluetooth relay, offline Wi-Fi, and store-and-forward status without implying they are operational.
+This is an engineering snapshot, not a release-ready or device-accepted application. See `docs/WIFI_DIRECT.md` and `docs/TESTING_CHECKLIST.md`.

@@ -26,6 +26,12 @@ function validIdentityKey(value) {
     value.length <= MAX_IDENTITY_KEY_LENGTH;
 }
 
+function cleanDisplayName(value, fallback = 'Nearby device') {
+  if (typeof value !== 'string' || value.length > 32) return fallback;
+  const name = value.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  return name || fallback;
+}
+
 function makeTranscript(session) {
   return JSON.stringify([
     'MeshChat Pairing v2',
@@ -46,6 +52,7 @@ export class PairingController {
       onState = () => {},
       onSecure = () => {},
       getIdentity,
+      getDisplayName = async () => '',
       findTrusted = async () => null
     } = {}
   ) {
@@ -57,9 +64,12 @@ export class PairingController {
     this.onState = onState;
     this.onSecure = onSecure;
     this.getIdentity = getIdentity;
+    this.getDisplayName = getDisplayName;
     this.findTrusted = findTrusted;
     this.sessions = new Map();
     this.secureSessions = new Map();
+    this.identitySessions = new Map();
+    this.peerFingerprints = new Map();
 
     this.removeMessageListener = this.bluetooth.onMessage(({ data, peerId }) => {
       return this.handleMessage(data, peerId).catch(error => {
@@ -68,7 +78,10 @@ export class PairingController {
     });
 
     this.removeDisconnectListener = this.bluetooth.onDisconnect(peerId => {
-      this.cancel(peerId, 'disconnected', false);
+      const fingerprint = this.bluetooth.getPeerFingerprint?.(peerId) ||
+        (/^[a-f0-9]{64}$/i.test(String(peerId)) ? String(peerId).toLowerCase() : null);
+      if (fingerprint) this.cancelIdentity(fingerprint, 'disconnected', false);
+      else this.cancel(peerId, 'disconnected', false);
     });
   }
 
@@ -141,6 +154,7 @@ export class PairingController {
     try {
       const identity = await session.crypto.createIdentity();
       const local = await this.getIdentity();
+      const displayName = cleanDisplayName(await this.getDisplayName(), 'MeshChat');
 
       if (!this.isCurrent(session)) {
         session.crypto.clearIdentity();
@@ -148,6 +162,7 @@ export class PairingController {
       }
 
       session.identity = local;
+      session.localDisplayName = displayName;
       session.localPublicKey = identity.publicKey;
 
       await this.send(peerId, {
@@ -156,7 +171,8 @@ export class PairingController {
         sessionId: session.sessionId,
         nonce: session.localNonce,
         publicKey: identity.publicKey,
-        identityKey: local.publicKeySpki
+        identityKey: local.publicKeySpki,
+        displayName
       });
     } catch (error) {
       if (this.isCurrent(session)) {
@@ -235,7 +251,7 @@ export class PairingController {
 
     const session = {
       peerId,
-      peerName: this.bluetooth.peers.get(peerId)?.name || 'Nearby device',
+      peerName: cleanDisplayName(packet.displayName, this.bluetooth.peers.get(peerId)?.name || 'Nearby device'),
       role: 'responder',
       sessionId: packet.sessionId,
       remoteNonce: packet.nonce,
@@ -256,6 +272,7 @@ export class PairingController {
     try {
       const identity = await session.crypto.createIdentity();
       const local = await this.getIdentity();
+      const displayName = cleanDisplayName(await this.getDisplayName(), 'MeshChat');
 
       if (!this.isCurrent(session)) {
         session.crypto.clearIdentity();
@@ -267,6 +284,7 @@ export class PairingController {
       }
 
       session.identity = local;
+      session.localDisplayName = displayName;
       session.localPublicKey = identity.publicKey;
       session.localNonce = randomHex();
 
@@ -293,7 +311,8 @@ export class PairingController {
         sessionId: session.sessionId,
         nonce: session.localNonce,
         publicKey: identity.publicKey,
-        identityKey: local.publicKeySpki
+        identityKey: local.publicKeySpki,
+        displayName
       });
 
       await this.materialReady(session);
@@ -318,6 +337,7 @@ export class PairingController {
       return;
     }
 
+    session.peerName = cleanDisplayName(packet.displayName, session.peerName);
     session.ackReceived = true;
 
     try {
@@ -490,6 +510,9 @@ export class PairingController {
     };
 
     this.secureSessions.set(session.peerId, secureSession);
+    this.identitySessions.set(secureSession.remoteFingerprint, secureSession);
+    this.peerFingerprints.set(session.peerId, secureSession.remoteFingerprint);
+    this.bluetooth.associateIdentity?.(session.peerId, secureSession.remoteFingerprint);
     this.sessions.delete(session.peerId);
     session.crypto.clearIdentity();
 
@@ -530,7 +553,18 @@ export class PairingController {
       this.discard(session);
     }
 
+    const removedSession = this.secureSessions.get(peerId);
     this.secureSessions.delete(peerId);
+    if (removedSession) {
+      const fingerprint = removedSession.remoteFingerprint;
+      if (this.identitySessions.get(fingerprint) === removedSession) {
+        const replacement = [...this.secureSessions.values()].find(
+          candidate => candidate.remoteFingerprint === fingerprint
+        );
+        if (replacement) this.identitySessions.set(fingerprint, replacement);
+        else this.identitySessions.delete(fingerprint);
+      }
+    }
 
     // Do not raise pairing UI for a Bluetooth peer that was never pairing.
     if (session || hadSecure) {
@@ -539,11 +573,45 @@ export class PairingController {
   }
 
   getSecureSession(peerId) {
-    return this.secureSessions.get(peerId) || null;
+    const direct = this.secureSessions.get(peerId);
+    if (direct) return direct;
+    if (typeof peerId === 'string' && /^[a-f0-9]{64}$/i.test(peerId)) {
+      return this.identitySessions.get(peerId.toLowerCase()) || null;
+    }
+    const fingerprint = this.peerFingerprints.get(peerId) ||
+      this.bluetooth.getPeerFingerprint?.(peerId);
+    return fingerprint ? this.identitySessions.get(fingerprint.toLowerCase()) || null : null;
+  }
+
+  getSecureSessionForPacket(peerId, data) {
+    const direct = this.getSecureSession(peerId);
+    try {
+      const packet = JSON.parse(data);
+      if (packet?.type !== 'message' || typeof packet.sessionId !== 'string') return direct;
+      if (direct?.sessionId === packet.sessionId) return direct;
+      return [...this.secureSessions.values()].find(
+        session => session.sessionId === packet.sessionId
+      ) || null;
+    } catch {
+      return direct;
+    }
   }
 
   isSecure(peerId) {
     return this.secureSessions.has(peerId);
+  }
+
+  cancelIdentity(fingerprint, status = 'disconnected', notifyPeer = false) {
+    if (typeof fingerprint !== 'string') return;
+    const normalized = fingerprint.toLowerCase();
+    const peerIds = new Set();
+    for (const [peerId, session] of this.secureSessions) {
+      if (session.remoteFingerprint?.toLowerCase() === normalized) peerIds.add(peerId);
+    }
+    for (const [peerId, session] of this.sessions) {
+      if (session.remoteFingerprint?.toLowerCase() === normalized) peerIds.add(peerId);
+    }
+    for (const peerId of peerIds) this.cancel(peerId, status, notifyPeer);
   }
 
   // Forget every session, e.g. after the user clears local data.

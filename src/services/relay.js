@@ -76,13 +76,20 @@ export class RelayService {
     return envelope;
   }
 
-  async receive(envelope, now = Date.now()) {
+  async receive(envelope, now = Date.now(), receivedFrom = null) {
     if (!this.enabled) return { accepted: false, reason: 'relay-disabled' };
     validateEnvelope(envelope, now);
     if (envelope.hopsRemaining <= 0) return { accepted: false, reason: 'hop-limit' };
+    if (receivedFrom !== null && (typeof receivedFrom !== 'string' || receivedFrom.length > 128)) {
+      throw new Error('Invalid relay source peer.');
+    }
 
     await this.db.cleanupRelayData?.(now);
-    const packet = { ...envelope, receivedAt: now };
+    const packet = {
+      ...envelope,
+      receivedAt: now,
+      ...(receivedFrom ? { receivedFrom } : {})
+    };
 
     // Real IndexedDB storage reserves queue + deduplication records in one
     // read/write transaction. The fallback keeps lightweight test adapters

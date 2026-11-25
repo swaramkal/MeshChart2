@@ -76,8 +76,9 @@ export class MeshDatabase {
   }
 
   async saveProfile(profile) {
+    const current = await this.getProfile();
     return this.request(
-      this.transaction('profile', 'readwrite').put({ id: 'self', ...profile })
+      this.transaction('profile', 'readwrite').put({ ...current, ...profile, id: 'self' })
     );
   }
 
@@ -192,6 +193,25 @@ export class MeshDatabase {
     }
 
     return this.request(this.transaction('messages', 'readwrite').put(message));
+  }
+
+  async saveMessageIfAbsent(message) {
+    if (!message?.id || !message?.peerId || typeof message.text !== 'string') {
+      throw new Error('Invalid message record.');
+    }
+
+    try {
+      await this.request(this.transaction('messages', 'readwrite').add(message));
+      return true;
+    } catch (error) {
+      if (error?.name === 'ConstraintError') return false;
+      throw error;
+    }
+  }
+
+  async getMessage(id) {
+    if (!id) return null;
+    return (await this.request(this.transaction('messages').get(id))) || null;
   }
 
   async saveAttachment(file) {

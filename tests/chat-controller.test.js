@@ -28,6 +28,16 @@ class FakeDb {
     this.messages.set(message.id, { ...message });
   }
 
+  async saveMessageIfAbsent(message) {
+    if (this.messages.has(message.id)) return false;
+    this.messages.set(message.id, { ...message });
+    return true;
+  }
+
+  async getMessage(id) {
+    return this.messages.get(id) || null;
+  }
+
   async getMessages(peerId) {
     return [...this.messages.values()]
       .filter(m => m.peerId === peerId)
@@ -128,6 +138,17 @@ test('delivered is final and is not overwritten by a late sent', async () => {
   const [stored] = await chat.getMessages('p1');
   assert.equal(stored.status, 'delivered');
   assert.equal(chat.getConversation('p1').lastStatus, 'delivered');
+});
+
+test('replayed application message IDs do not create another visible message', async () => {
+  const { db, chat } = await setup();
+  const first = await chat.addMessage('p1', 'hello', 'in', 'delivered', { messageId: 'msg_123' });
+  const replay = await chat.addMessage('p1', 'hello', 'in', 'delivered', { messageId: 'msg_123' });
+
+  assert.equal(first.id, 'msg_123');
+  assert.equal(replay.duplicate, true);
+  assert.equal((await db.getMessages('p1')).length, 1);
+  assert.equal(chat.getConversation('p1').unread, 1);
 });
 
 test('deleting a conversation removes its messages and closes it', async () => {
