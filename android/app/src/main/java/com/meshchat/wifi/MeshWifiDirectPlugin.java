@@ -643,7 +643,7 @@ public class MeshWifiDirectPlugin extends Plugin {
         PeerSocket peer;
         try {
             peer = new PeerSocket(socket);
-            writeFrame(peer, makeHello());
+            writeFrame(peer, makeHello().toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException error) {
             closeSocket(socket);
             emitError("socket", "Could not initialize the local Wi-Fi Direct socket.");
@@ -733,7 +733,7 @@ public class MeshWifiDirectPlugin extends Plugin {
         }
     }
 
-    private JSONObject event(String key, Object value) {
+    private JSObject event(String key, Object value) {
         JSObject result = new JSObject();
         result.put(key, value);
         return result;
