@@ -722,7 +722,7 @@ public class MeshWifiDirectPlugin extends Plugin {
         }
     }
 
-    private JSONObject event(String key, Object value) {
+    private JSObject event(String key, Object value) {
         JSObject result = new JSObject();
         result.put(key, value);
         return result;
